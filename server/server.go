@@ -1,27 +1,54 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
-	"github.com/beevik/ntp"
 	"net"
 	"time"
 )
 
+var ntpServer = "il.pool.ntp.org:123"
+
+func printResponse(ntpResponse []byte) {
+	transmitTime := binary.BigEndian.Uint32(ntpResponse[40:44])
+	fraction := binary.BigEndian.Uint32(ntpResponse[44:48])
+	ntpTime := time.Unix(int64(transmitTime-2208988800), int64(uint64(fraction)*(1<<32/uint64(1e9))))
+
+	fmt.Println("Current NTP time:", ntpTime)
+}
+
 func handleClient(client_conn net.Conn) {
 	defer client_conn.Close()
-	ntpTime, err := ntp.Time("pool.ntp.client")
-	if err != nil {
-		fmt.Println("Error getting ntp time: ", err)
-	}
-	unixTime := ntpTime.Unix()
 
-	ntpTimeString := time.Unix(unixTime, 0).String()
-	fmt.Println("Returning ntp time: ", ntpTimeString)
-	_, err = client_conn.Write([]byte(ntpTimeString))
+	conn, err := net.Dial("udp", ntpServer)
+	if err != nil {
+		fmt.Println("Error connecting to NTP server: ", err)
+		return
+	}
+	defer conn.Close()
+
+	ntpRequest := make([]byte, 48)
+	ntpRequest[0] = 0x1B // Set NTP version and mode (client)
+	_, err = conn.Write(ntpRequest)
+	if err != nil {
+		fmt.Println("Error sending NTP request:", err)
+		return
+	}
+
+	ntpResponse := make([]byte, 48)
+	_, err = conn.Read(ntpResponse)
+	if err != nil {
+		fmt.Println("Error receiving NTP response:", err)
+		return
+	}
+
+	_, err = client_conn.Write([]byte(ntpResponse))
 	if err != nil {
 		fmt.Println("Error sending NTP time to client:", err)
 		return
 	}
+
+	printResponse(ntpResponse)
 }
 
 func main() {
