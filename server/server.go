@@ -2,22 +2,16 @@ package main
 
 import (
 	"fmt"
-	"github.com/beevik/ntp"
 	"net"
 	"time"
 )
 
 func handleClient(client_conn net.Conn) {
 	defer client_conn.Close()
-	ntpTime, err := ntp.Time("pool.ntp.client")
-	if err != nil {
-		fmt.Println("Error getting ntp time: ", err)
-	}
-	unixTime := ntpTime.Unix()
 
-	ntpTimeString := time.Unix(unixTime, 0).String()
+	ntpTimeString := time.Unix(time.Now().Unix(), 0).String()
 	fmt.Println("Returning ntp time: ", ntpTimeString)
-	_, err = client_conn.Write([]byte(ntpTimeString))
+	_, err := client_conn.Write([]byte(ntpTimeString))
 	if err != nil {
 		fmt.Println("Error sending NTP time to client:", err)
 		return
